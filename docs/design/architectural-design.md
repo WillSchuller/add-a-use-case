@@ -302,7 +302,8 @@ sequenceDiagram
     API-->>SPA: Result { token: JWT (RSA-2048, 2h) }
     SPA->>SPA: store token (Pinia), set Bearer header
     SPA->>API: GET /api/v1/... (Bearer JWT)
-    API->>API: verify JWT, then AuthorizationManager (ownership/membership)
+    API->>DB: verify JWT, then confirm the account is still active (FR-SEC-active-account)
+    API->>API: AuthorizationManager (ownership/membership)
     API-->>SPA: Result { data }
 ```
 
@@ -392,7 +393,7 @@ Shared machinery every module reuses rather than reimplements — owned by the c
 | Subsystem | Owner | Notes |
 |---|---|---|
 | Standard API envelope & error handling | `system` (`Result`, `StatusCode`, `ExceptionHandlerAdvice`) | Every controller returns `Result`; all exceptions funnel through the global advice |
-| Authentication & RBAC | `security` (`SecurityConfiguration`, `authorizationmanagers/`) | JWT (RSA keypair at startup); URL rules + ownership/membership managers |
+| Authentication & RBAC | `security` (`SecurityConfiguration`, `authorizationmanagers/`) | JWT (RSA keypair at startup), with the account's active state read on each request; URL rules + ownership/membership managers |
 | Shared user model | `user` (`PeerEvaluationUser` base, password reset, invitation) | Common identity base for students/instructors; the auth subject for both modules |
 | Authorship & auditing | `system` (JPA auditing, `PeerEvaluationUserAuditorAware`) | Created/modified-by metadata applied automatically across entities |
 | Email | `system` (`EmailService`) | Gmail over SMTP. Reminders are a feature, not machinery: the `notification` slice decides who is reminded and calls `EmailService` |
@@ -431,7 +432,7 @@ Single-tenant (`CO-single-tenant`): one deployment serves one institution. The t
 - **Login:** HTTP Basic (email + password) → server issues a JWT (`AuthController` / `JwtProvider`). Passwords hashed with **BCrypt (strength 12)**.
 - **Tokens:** self-issued JWTs, **RSA-2048** signature, **2-hour** expiry, claims `sub`, `userId`, space-delimited `authorities`. Stateless OAuth2 resource server (`SessionCreationPolicy.STATELESS`).
 - **Provisioning:** invitation-gated registration (`user/userinvitation` — `validateUserInvitation` rejects any sign-up without a matching course-admin-issued invitation; see Known gaps); password reset via a one-time token valid **5 minutes**.
-- **Known gaps:** no token **refresh** or **revocation/blocklist** — a token is valid for its full 2h (a leaked token can't be revoked; logout is client-side only). The RSA key regenerates per startup (KD-self-issued-jwt). **`POST /students` and `POST /instructors` are `permitAll()` at the security-filter level, but registration is gated in the service layer**: both paths call `validateUserInvitation`, which rejects any registration lacking a course-admin-issued, single-use invitation whose email, token, role, course, and section all match (invitations are created via UC-STU-invite-students / UC-INS-invite-instructors). So account creation is **not** open self-registration — a stranger cannot self-provision, and an instructor account requires an *instructor* invitation. The residual concern is defense-in-depth: the only gate is service-layer (there is no filter-chain authorization rule), and the endpoint is unauthenticated and unthrottled (rate limiting is [TD-auth-rate-limit](#risks-and-technical-debt)).
+- **Known gaps:** no token **refresh** or **revocation/blocklist** — a token is valid for its full 2h unless its account is deactivated (a leaked token of an active account can't be revoked; logout is client-side only). The RSA key regenerates per startup (KD-self-issued-jwt). **`POST /students` and `POST /instructors` are `permitAll()` at the security-filter level, but registration is gated in the service layer**: both paths call `validateUserInvitation`, which rejects any registration lacking a course-admin-issued, single-use invitation whose email, token, role, course, and section all match (invitations are created via UC-STU-invite-students / UC-INS-invite-instructors). So account creation is **not** open self-registration — a stranger cannot self-provision, and an instructor account requires an *instructor* invitation. The residual concern is defense-in-depth: the only gate is service-layer (there is no filter-chain authorization rule), and the endpoint is unauthenticated and unthrottled (rate limiting is [TD-auth-rate-limit](#risks-and-technical-debt)).
 
 #### **Authorization**
 
@@ -581,7 +582,7 @@ The functional structure (the [component views](#building-block-view) above) is 
 **KD-self-issued-jwt — Self-issued, stateless JWT (RSA keypair generated at startup).** *Accepted; key handling incidental — revisit.*
 - **Driving ASR(s):** self-hosted authentication (`CO-single-auth`, `SEC-authentication`) and student-record confidentiality (`SEC-authorization`, `SEC-ferpa`).
 - **Context:** Wanted stateless auth (no server-side session store); no external identity provider in scope.
-- **Decision:** Self-issue and verify JWTs rather than use sessions or an external IdP. The current implementation generates the RSA keypair at application startup.
+- **Decision:** Self-issue and verify JWTs rather than use sessions or an external IdP. The current implementation generates the RSA keypair at application startup. Each authenticated request also reads the account's active state, so deactivation takes effect at once (FR-SEC-active-account); there is still no session store.
 - **Consequences:** No session store; simple. *Rejected* external IdP / institutional SSO — beyond integration cost, institutional SSO onboarding is impractical at this scale (the institution's IT will not provision a relying-party integration for a course tool), so the platform authenticates users itself; the SRS's auth requirements (FR-SEC-authentication, CO-single-auth) accordingly delegate to *this* mechanism, not to an external IdP. *Rejected* sessions (server state). **Known limitation (incidental, not by design):** because the keypair is generated per startup and not persisted, every restart/redeploy invalidates all live tokens (users re-login) and a second instance can't verify the first's tokens — effectively capping the app at one instance. Externalizing/persisting the keys would lift this. (Drives the Scalability "accepted" trade-off and QS-release-deploy; revisit when multi-instance is needed.)
 
 **KD-no-codegen — No Lombok / no MapStruct (pedagogical).** *Accepted.*
