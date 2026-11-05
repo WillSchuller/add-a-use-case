@@ -711,7 +711,7 @@ The REST API is published on SwaggerHub as two documents: the [Project Pulse API
 
 ## **Communications Interfaces**
 
-CI-email-notifications: Project Pulse shall deliver every email notification through the Gmail SMTP integration (per CO-gmail-smtp, DE-gmail-smtp). Such notifications arise in both capability areas: performance tracking sends each student a weekly submission reminder for weekly activity reports and peer evaluations (FR-NOT-weekly-reminder) and notifies students and instructors of team-membership changes (UC-TEA-assign-students, UC-TEA-remove-student, UC-TEA-delete-team, UC-INS-assign-instructors); requirements authoring sends review-workflow notices on submission and review outcome (UC-REV-submit-for-review, UC-REV-review-documents).
+CI-email-notifications: Project Pulse shall deliver every email notification through the Gmail SMTP integration (per CO-gmail-smtp, DE-gmail-smtp). Such notifications arise in both capability areas: performance tracking sends each student a weekly submission reminder for weekly activity reports and peer evaluations (FR-NOT-weekly-reminder), notifies a student that her account has been deactivated (UC-STU-deactivate-student), and notifies students and instructors of team-membership changes (UC-TEA-assign-students, UC-TEA-remove-student, UC-TEA-delete-team, UC-INS-assign-instructors); requirements authoring sends review-workflow notices on submission and review outcome (UC-REV-submit-for-review, UC-REV-review-documents).
 
 CI-no-routine-email: Project Pulse shall send no email for the routine requirements-authoring changes suppressed by FR-NOT-suppress-routine.
 
