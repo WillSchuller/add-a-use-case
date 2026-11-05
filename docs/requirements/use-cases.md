@@ -1533,6 +1533,8 @@ Details:
 
 **Associated Information:**
 - The course admin or instructor shall be able to cancel the use case at any time prior to submitting it.
+- Constraints from UC-STU-deactivate-student: A reactivated student is on the team she had when she was deactivated, unless a course admin removed her in the meantime. Reactivation clears her recorded deactivation date, so the course section's peer evaluation report lists her again for the weeks she was deactivated, with no peer evaluations for those weeks. Peer evaluations of her can be submitted and edited again within their submission windows.
+- Until this use case is built: The student edit form's Status control offers only reactivation and clears the date, but does not notify the student (step 6). A course admin not assigned to the student's course section cannot save that form (OI-66).
 
 **Related Use Cases:** UC-STU-delete-student: Delete a student; UC-STU-deactivate-student: Deactivate a student
 **Assumptions:**
