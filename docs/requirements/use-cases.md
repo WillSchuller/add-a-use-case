@@ -1458,10 +1458,11 @@ Details:
 
 **Preconditions:**
 - PRE-1. The course admin or instructor is logged into the system.
-- PRE-2. There exists at least one active student in the system.
+- PRE-2. The student to be deactivated is active.
 
 **Postconditions:**
-- POST-1. The student's account is deactivated.
+- POST-1. The student's account is deactivated and the date is recorded.
+- POST-2. The student's submitted work and team assignment are unchanged.
 
 **Main Success Scenario:**
 1. The course admin or instructor indicates to deactivate a student.
@@ -1469,18 +1470,33 @@ Details:
 3. The course admin or instructor chooses to deactivate this student.
 4. The system alerts the course admin or instructor of the consequences of this deactivation defined in the Associated Information of this use case, warns about the deactivation, and asks for confirmation.
 5. The course admin or instructor confirms the deactivation.
-6. The system deactivates the student and alerts the course admin or instructor that this student has been deactivated.
+6. The system deactivates the student, notifies this student that her account has been deactivated, and alerts the course admin or instructor that this student has been deactivated.
 7. Use case ends.
 
 **Extensions:**
+- **3a. The user is not permitted to deactivate this student (BR-student-lifecycle), or the student does not exist:**
+  - 3a1. The system refuses the request and changes nothing.
+  - 3a2. Use case ends.
+- **4a. The course admin or instructor cancels at the warning:**
+  - 4a1. The system closes the warning and changes nothing.
+  - 4a2. Use case ends.
+- **6a. The student has already been deactivated, for example by another instructor since the details were displayed:**
+  - 6a1. The system alerts the course admin or instructor that this student is already deactivated, changes nothing, keeps the recorded date, and does not notify the student.
+  - 6a2. Use case ends.
+- **6b. The system cannot send the notification to the student:**
+  - 6b1. The student remains deactivated. The system alerts the course admin or instructor that the student has been deactivated but could not be notified.
+  - 6b2. Use case ends.
+
 **Priority:** Low
 **Frequency of Use:** Rare. Occurs occasionally when a student withdraws from a course section.
-**Business Rules:** BR-student-lifecycle
+**Business Rules:** BR-student-lifecycle, BR-submission-owed, BR-deactivated-evaluatee, BR-deactivated-student-report-weeks, BR-section-scoped-access
 
 **Associated Information:**
-- Consequence of the deactivation: The student will no longer be able to log in or submit weekly activity reports and peer evaluations, but the student's account and her previously submitted work are kept in the system. Deactivation will NOT remove the student from the system, and the account can be reactivated in the future (UC-STU-reactivate-student: Reactivate a student). This is distinct from deletion (UC-STU-delete-student: Delete a student), which is a physical, unrecoverable delete. The course admin or instructor shall be able to cancel the use case at any time prior to submitting it.
+- Consequence of the deactivation: The student will no longer be able to log in or submit weekly activity reports and peer evaluations, but the student's account and her previously submitted work are kept in the system. She stays on her team, but no longer receives reminders, and her teammates no longer owe or may write a peer evaluation of her. The course section's peer evaluation report lists her only for certain weeks (BR-deactivated-student-report-weeks). Deactivation will NOT remove the student from the system, and the account can be reactivated in the future (UC-STU-reactivate-student: Reactivate a student). This is distinct from deletion (UC-STU-delete-student: Delete a student), which is a physical, unrecoverable delete. The course admin or instructor shall be able to cancel the use case at any time prior to submitting it.
+- Open sessions: Deactivation takes effect on the student's next request, including a request from a session she already has open (FR-SEC-active-account).
+- One path: This use case is the only way to deactivate a student. The system offers the choice in step 3 only for an active student, and the student edit form cannot deactivate her.
 
-**Related Use Cases:** UC-STU-delete-student: Delete a student; UC-STU-reactivate-student: Reactivate a student
+**Related Use Cases:** UC-STU-delete-student: Delete a student; UC-STU-reactivate-student: Reactivate a student; UC-EVA-submit-evaluation: Submit a peer evaluation for the previous week; UC-EVA-section-evaluation-report: Generate a peer evaluation report of the entire course section
 **Assumptions:**
 **Open Issues:**
 
