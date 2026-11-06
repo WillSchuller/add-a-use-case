@@ -20,8 +20,7 @@ public interface StudentRepository extends JpaRepository<Student, Integer>, JpaS
     /**
      * The student, if the user is an instructor assigned to her course section or the admin of its course
      * (BR-student-lifecycle, BR-section-scoped-access). The scope is in the query rather than compared after a
-     * primary-key load, per Authorization point 2. {@code exists}, not a join, so that a course section with several
-     * instructors still yields one row for its course admin.
+     * primary-key load, per Authorization point 2.
      */
     @Query("""
             select student from Student student

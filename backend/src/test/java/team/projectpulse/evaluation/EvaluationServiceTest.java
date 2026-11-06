@@ -656,17 +656,16 @@ class EvaluationServiceTest {
 
     @Test
     void testEvaluationsADeactivatedStudentWroteStillCountInHerTeammatesAverages() {
-        // Given: John wrote these evaluations of Eric, and has since been deactivated
-        given(this.evaluationRepository.findByWeekAndEvaluateeId("2023-W31", 4)).willReturn(this.ericsW31Evaluations);
-        double averageBefore = this.evaluationService.getPeerEvaluationAverage("2023-W31", this.eric).getAverageTotalScore();
+        // Given: John wrote one of Eric's three evaluations for this week, and has since been deactivated
+        assertThat(this.ericsW31Evaluations).extracting(PeerEvaluation::getEvaluator).contains(this.john);
         this.john.deactivate(LocalDateTime.of(2023, 8, 7, 9, 0));
+        given(this.evaluationRepository.findByWeekAndEvaluateeId("2023-W31", 4)).willReturn(this.ericsW31Evaluations);
 
         // When
-        double averageAfter = this.evaluationService.getPeerEvaluationAverage("2023-W31", this.eric).getAverageTotalScore();
+        double average = this.evaluationService.getPeerEvaluationAverage("2023-W31", this.eric).getAverageTotalScore();
 
-        // Then
-        assertThat(this.ericsW31Evaluations).isNotEmpty();
-        assertThat(averageAfter).isEqualTo(averageBefore);
+        // Then: the average of all three, the same as testGenerateWeeklyPeerEvaluationReportForSection expects of Eric
+        assertThat(average).isCloseTo(50.0, within(0.01));
     }
 
     // BR-deactivated-student-report-weeks

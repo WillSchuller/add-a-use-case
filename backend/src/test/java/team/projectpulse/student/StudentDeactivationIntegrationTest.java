@@ -20,7 +20,6 @@ import team.projectpulse.system.EmailService;
 import team.projectpulse.system.StatusCode;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -49,8 +48,6 @@ class StudentDeactivationIntegrationTest extends AbstractIntegrationTest {
     @MockitoSpyBean
     EmailService emailService; // Real sends to the Mailpit container; the spy records them, and can make one fail
 
-    @Autowired
-    Clock clock;
     @Autowired
     MockMvc mockMvc;
     @Autowired
@@ -100,7 +97,7 @@ class StudentDeactivationIntegrationTest extends AbstractIntegrationTest {
 
         reloadJohn();
         assertThat(this.john.isEnabled()).isFalse();
-        assertThat(this.john.getDeactivatedAt()).isEqualTo(LocalDateTime.now(this.clock));
+        assertThat(this.john.getDeactivatedAt()).isEqualTo(LocalDateTime.of(2023, 8, 20, 23, 30)); // The dev profile's fixed clock
         assertThat(this.john.getTeam().getTeamId()).isEqualTo(teamId);
         assertThat(count("select count(a) from Activity a where a.student = :student")).isEqualTo(activities);
         assertThat(count("select count(e) from PeerEvaluation e where e.evaluator = :student")).isEqualTo(evaluationsWritten);
@@ -273,13 +270,13 @@ class StudentDeactivationIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("The scoped finder returns one row for a course admin, however many instructors the course section has")
-    void theScopedFinderAdmitsTheCourseAdminOfACourseSectionWithSeveralInstructors() {
+    @DisplayName("The scoped finder returns her for the admin of her course, when not assigned to her course section")
+    void theScopedFinderAdmitsTheCourseAdminNotAssignedToHerCourseSection() {
         // Given
         Instructor courseAdmin = this.john.getSection().getCourse().getCourseAdmin();
-        this.john.getSection().removeInstructor(courseAdmin); // Assigned to neither, and Bill remains
+        this.john.getSection().removeInstructor(courseAdmin);
         this.entityManager.flush();
-        assertThat(this.john.getSection().getInstructors()).isNotEmpty();
+        assertThat(this.john.getSection().getInstructors()).doesNotContain(courseAdmin);
 
         // Then
         assertThat(this.studentRepository.findByIdAndManagedByUser(this.john.getId(), courseAdmin.getId())).contains(this.john);
