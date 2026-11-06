@@ -250,8 +250,9 @@ class StudentServiceTest {
     }
 
     @Test
-    void testDeactivateStudentOutsideTheCallersScopeIsNotFoundAndChangesNothing() {
-        // Given: the route rule is not involved here, so this is the scoped load standing alone (Authorization point 2)
+    void testDeactivateStudentThatTheFinderDoesNotReturnIsNotFoundAndChangesNothing() {
+        // Given: the finder is mocked, so this proves only what the service does with an empty result. Whether the
+        // finder's scope is right is StudentDeactivationIntegrationTest.theScopedFinderRefusesEveryoneElse
         given(this.userUtils.getUserId()).willReturn(2);
         given(this.studentRepository.findByIdAndManagedByUser(1, 2)).willReturn(Optional.empty());
 

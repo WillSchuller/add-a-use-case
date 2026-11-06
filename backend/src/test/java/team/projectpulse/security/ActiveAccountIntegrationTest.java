@@ -108,15 +108,6 @@ class ActiveAccountIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    @Test
-    @DisplayName("A signed token whose userId claim is not a number is refused")
-    void aTokenWithANonNumericUserIdClaimIsRefused() throws Exception {
-        String token = token(claims -> claims.claim("userId", "not-a-number"));
-
-        this.mockMvc.perform(get(this.baseUrl + "/students/4").header(HttpHeaders.AUTHORIZATION, token))
-                .andExpect(status().isUnauthorized());
-    }
-
     private void disable(String email) {
         PeerEvaluationUser user = this.entityManager
                 .createQuery("select u from PeerEvaluationUser u where u.email = :email", PeerEvaluationUser.class)

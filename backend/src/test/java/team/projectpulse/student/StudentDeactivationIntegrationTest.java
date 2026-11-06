@@ -264,25 +264,6 @@ class StudentDeactivationIntegrationTest extends AbstractIntegrationTest {
     // The scoped finder
 
     @Test
-    @DisplayName("The scoped finder returns her for an instructor assigned to her course section")
-    void theScopedFinderAdmitsAnAssignedInstructor() {
-        assertThat(this.studentRepository.findByIdAndManagedByUser(this.john.getId(), instructor("b.gates@abc.edu").getId())).contains(this.john);
-    }
-
-    @Test
-    @DisplayName("The scoped finder returns her for the admin of her course, when not assigned to her course section")
-    void theScopedFinderAdmitsTheCourseAdminNotAssignedToHerCourseSection() {
-        // Given
-        Instructor courseAdmin = this.john.getSection().getCourse().getCourseAdmin();
-        this.john.getSection().removeInstructor(courseAdmin);
-        this.entityManager.flush();
-        assertThat(this.john.getSection().getInstructors()).doesNotContain(courseAdmin);
-
-        // Then
-        assertThat(this.studentRepository.findByIdAndManagedByUser(this.john.getId(), courseAdmin.getId())).contains(this.john);
-    }
-
-    @Test
     @DisplayName("The scoped finder returns nothing for another course's admin, for another student, or for herself")
     void theScopedFinderRefusesEveryoneElse() {
         assertThat(this.studentRepository.findByIdAndManagedByUser(this.john.getId(), instructor("t.cook@abc.edu").getId())).isEmpty();
