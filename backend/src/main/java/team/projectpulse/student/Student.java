@@ -48,4 +48,20 @@ public class Student extends PeerEvaluationUser {
         this.deactivatedAt = deactivatedAt;
     }
 
+    /**
+     * Revokes her access and records when. Her team and her submitted work are untouched (BR-student-lifecycle).
+     */
+    public void deactivate(LocalDateTime at) {
+        setEnabled(false);
+        this.deactivatedAt = at;
+    }
+
+    /**
+     * Restores her access and clears the date, so the course section's peer evaluation report lists her again.
+     */
+    public void reactivate() {
+        setEnabled(true);
+        this.deactivatedAt = null;
+    }
+
 }
