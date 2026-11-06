@@ -12,8 +12,8 @@ import team.projectpulse.student.StudentSecurityService;
 import java.util.function.Supplier;
 
 /**
- * Guards reading one student's detailed peer evaluation results, private comments included, admitting only an instructor
- * of that student's course section.
+ * Admits only an instructor of a student's course section. Guards reading that student's detailed peer evaluation
+ * results, private comments included, and, with {@link StudentCourseAdminAuthorizationManager}, deactivating her.
  *
  * <p>Reads {@code studentId} and delegates to {@link StudentSecurityService#isCurrentUserInstructorOfStudentSection}.
  */
