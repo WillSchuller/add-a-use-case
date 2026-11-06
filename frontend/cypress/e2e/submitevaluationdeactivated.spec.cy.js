@@ -153,4 +153,24 @@ describe('Peer evaluation form with a deactivated team member', () => {
     cy.get('.el-message--success').should('not.exist')
     cy.get('@receipt.all').should('have.length', 0)
   })
+
+  it('does not leave the button spinning when the reload after a refused save fails', () => {
+    // Given: the form loaded while Jerry was active, and saving his evaluation is refused
+    cy.intercept('POST', '**/evaluations', {
+      statusCode: 400,
+      body: { flag: false, code: 400, message: "This teammate's account is deactivated." }
+    }).as('submit')
+    openForm([john, { ...jerry, enabled: true }], [])
+
+    // When: the reload that follows the refusal fails too
+    cy.intercept('GET', '**/students/teams/*', {
+      statusCode: 500,
+      body: { flag: false, code: 500, message: 'A server internal error occurs.' }
+    }).as('teamReload')
+    cy.contains('button', 'Submit').click()
+    cy.wait('@teamReload')
+
+    // Then
+    cy.contains('button', 'Submit').should('not.have.class', 'is-loading')
+  })
 })

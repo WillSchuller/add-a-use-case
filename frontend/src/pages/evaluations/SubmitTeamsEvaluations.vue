@@ -292,8 +292,12 @@ async function settleSaves(saves: Promise<PeerEvaluation>[]) {
     ({ reason }) => axios.isAxiosError(reason) && reason.response?.status === 400
   )
   if (refused) {
-    await loadStudents()
-    await prepareStartingPeerEvaluations()
+    try {
+      await loadStudents()
+      await prepareStartingPeerEvaluations()
+    } catch {
+      // The shared request instance has reported it. The form keeps what it shows, and the buttons must not keep spinning.
+    }
   }
   isLoading.value = false
   return undefined
