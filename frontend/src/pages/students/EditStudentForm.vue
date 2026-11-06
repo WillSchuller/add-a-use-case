@@ -13,9 +13,11 @@
     <el-form-item label="Username:" prop="username">
       <el-input v-model="studentBeingEdited.username"></el-input>
     </el-form-item>
-    <el-form-item label="Status:" prop="enabled">
+    <!-- Only reactivates, until UC-STU-reactivate-student is built. Deactivating is the button below. -->
+    <el-form-item v-if="loadedAsDeactivated === true" label="Status:" prop="enabled">
       <el-switch
         v-model="studentBeingEdited.enabled"
+        data-cy="student-status"
         inline-prompt
         active-text="Enabled"
         inactive-text="Disabled"
@@ -35,6 +37,17 @@
       <el-input v-model="studentBeingEdited.teamName" disabled></el-input>
     </el-form-item>
     <div style="display: flex; justify-content: end">
+      <el-button
+        v-if="loadedAsDeactivated === false"
+        data-cy="deactivate-student"
+        type="danger"
+        plain
+        :loading="deactivating"
+        style="margin-right: auto"
+        @click="confirmDeactivation()"
+      >
+        Deactivate
+      </el-button>
       <el-button @click="$emit('close-dialog')"> Cancel </el-button>
       <el-button type="primary" @click="updateExistingStudent()"> Confirm </el-button>
     </div>
@@ -42,11 +55,12 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
+import axios from 'axios'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Student } from '@/apis/student/types'
 import type { FormInstance } from 'element-plus'
-import { findStudentById, updateStudent } from '@/apis/student'
-import { ref, onMounted } from 'vue'
+import { deactivateStudent, findStudentById, updateStudent } from '@/apis/student'
+import { h, ref, onMounted } from 'vue'
 
 const { studentId } = defineProps(['studentId'])
 const emit = defineEmits(['close-dialog'])
@@ -63,6 +77,11 @@ const studentBeingEdited = ref<Student>({
 })
 
 const studentForm = ref<FormInstance>() // Form reference
+
+// Whether the student was deactivated when last loaded, unlike studentBeingEdited.enabled, which the Status switch
+// changes. Null until she has loaded, so that neither the switch nor the Deactivate button flashes up first.
+const loadedAsDeactivated = ref<boolean | null>(null)
+const deactivating = ref(false)
 
 // Validation rules
 const rules = {
@@ -94,6 +113,7 @@ async function loadStudent(studentId: number) {
   studentBeingEdited.value.id = result.data.id as number
   studentBeingEdited.value.username = result.data.username
   studentBeingEdited.value.enabled = result.data.enabled
+  loadedAsDeactivated.value = !result.data.enabled
   studentBeingEdited.value.firstName = result.data.firstName
   studentBeingEdited.value.lastName = result.data.lastName
   studentBeingEdited.value.email = result.data.email
@@ -110,7 +130,9 @@ async function updateExistingStudent() {
   const updatedStudent: Student = {
     id: studentBeingEdited.value.id,
     username: studentBeingEdited.value.username,
-    enabled: studentBeingEdited.value.enabled,
+    // True only to reactivate her. The server reads true on a deactivated student as reactivation, so sending the true
+    // this form loaded for an active student would undo a deactivation made by someone else since it opened.
+    enabled: loadedAsDeactivated.value === true && studentBeingEdited.value.enabled,
     firstName: studentBeingEdited.value.firstName,
     lastName: studentBeingEdited.value.lastName,
     email: studentBeingEdited.value.email
@@ -121,6 +143,53 @@ async function updateExistingStudent() {
 
   ElMessage.success('Student updated successfully')
   emit('close-dialog')
+}
+
+// UC-STU-deactivate-student, steps 3 to 6
+async function confirmDeactivation() {
+  const name = `${studentBeingEdited.value.firstName} ${studentBeingEdited.value.lastName}`
+
+  try {
+    await ElMessageBox.confirm(
+      h('div', { 'data-cy': 'deactivate-consequences' }, [
+        h(
+          'p',
+          `${name} will no longer be able to log in or submit weekly activity reports and peer evaluations.`
+        ),
+        h(
+          'p',
+          'Her account and submitted work are kept, and she stays on her team, but she no longer receives reminders.'
+        ),
+        h(
+          'p',
+          "Her teammates no longer owe or may write a peer evaluation of her, and the course section's peer evaluation report lists her only for certain weeks."
+        ),
+        h('p', 'This is not a deletion: her account can be reactivated later.')
+      ]),
+      'Deactivate this student?',
+      { confirmButtonText: 'Deactivate', cancelButtonText: 'Cancel', type: 'warning' }
+    )
+  } catch {
+    return // 4a: cancelled at the warning, so nothing is sent
+  }
+
+  deactivating.value = true
+  try {
+    const result = await deactivateStudent(studentBeingEdited.value.id as number)
+    if (result.data.noticeSent) {
+      ElMessage.success(`${name} has been deactivated and notified.`)
+    } else {
+      ElMessage.warning(`${name} has been deactivated but could not be notified.`) // 6b
+    }
+    emit('close-dialog')
+  } catch (error) {
+    // 6a: the shared request instance has already shown the server's message
+    if (axios.isAxiosError(error) && error.response?.status === 409) {
+      await loadStudent(studentId)
+    }
+  } finally {
+    deactivating.value = false
+  }
 }
 </script>
 
