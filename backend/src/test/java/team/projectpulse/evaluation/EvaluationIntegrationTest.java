@@ -6,6 +6,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import team.projectpulse.AbstractIntegrationTest;
 import team.projectpulse.evaluation.dto.PeerEvaluationDto;
 import team.projectpulse.evaluation.dto.RatingDto;
+import team.projectpulse.student.Student;
 import team.projectpulse.system.StatusCode;
 import org.hamcrest.Matchers;
 import org.json.JSONObject;
@@ -24,6 +25,7 @@ import org.springframework.util.MultiValueMap;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 
@@ -33,6 +35,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @DisplayName("Integration tests for Evaluation API endpoints")
 public class EvaluationIntegrationTest extends AbstractIntegrationTest {
@@ -283,6 +286,76 @@ public class EvaluationIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.flag").value(false))
                 .andExpect(jsonPath("$.code").value(StatusCode.INVALID_ARGUMENT))
                 .andExpect(jsonPath("$.message").value("You have already submitted an evaluation for Eric in this week."));
+    }
+
+    @Test
+    void testStudentJohnCannotAddAnEvaluationOfADeactivatedTeammate() throws Exception {
+        // Given: Jerry is John's teammate, deactivated, with no evaluation from John for 2023-W33
+        List<RatingDto> ratingDtos = List.of(
+                new RatingDto(null, 1, 4.0),
+                new RatingDto(null, 2, 9.0),
+                new RatingDto(null, 3, 7.0),
+                new RatingDto(null, 4, 10.0),
+                new RatingDto(null, 5, 5.0),
+                new RatingDto(null, 6, 6.0)
+        );
+        LocalDate fixedDate = LocalDate.of(2023, 8, 22); // Falls in 2023-W34, which makes 2023-W33 the previous week
+        Clock fixedClock = Clock.fixed(fixedDate.atStartOfDay(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault());
+        given(this.clock.instant()).willReturn(fixedClock.instant());
+        given(this.clock.getZone()).willReturn(fixedClock.getZone());
+        Student jerry = deactivate("j.moon@abc.edu");
+        long evaluationsBefore = this.evaluationRepository.count();
+
+        PeerEvaluationDto peerEvaluationDto = new PeerEvaluationDto(null, "2023-W33", 4, "John Smith", jerry.getId(), "Jerry Moon", ratingDtos, 41.0, "Good job", "Keep it up", null, null);
+        String json = this.jsonMapper.writeValueAsString(peerEvaluationDto);
+
+        // When and then
+        this.mockMvc.perform(post(this.baseUrl + "/evaluations").contentType(MediaType.APPLICATION_JSON).content(json).accept(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, this.studentJohnToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.flag").value(false))
+                .andExpect(jsonPath("$.code").value(StatusCode.INVALID_ARGUMENT))
+                .andExpect(jsonPath("$.message").value("This teammate's account is deactivated."));
+        assertThat(this.evaluationRepository.count()).isEqualTo(evaluationsBefore);
+    }
+
+    @Test
+    void testEvaluatorJohnCannotEditAnEvaluationOfADeactivatedTeammateInsideItsWindow() throws Exception {
+        // Given: evaluation 1 is John's of Eric, editable in 2023-W32, and Eric is deactivated
+        List<RatingDto> ratingDtos = List.of(
+                new RatingDto(1, 1, 4.0),
+                new RatingDto(2, 2, 9.0),
+                new RatingDto(3, 3, 7.0),
+                new RatingDto(4, 4, 10.0),
+                new RatingDto(5, 5, 5.0),
+                new RatingDto(6, 6, 6.0)
+        );
+        LocalDate fixedDate = LocalDate.of(2023, 8, 8);
+        Clock fixedClock = Clock.fixed(fixedDate.atStartOfDay(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault());
+        given(this.clock.instant()).willReturn(fixedClock.instant());
+        given(this.clock.getZone()).willReturn(fixedClock.getZone());
+        deactivate("e.hudson@abc.edu");
+        String publicCommentBefore = this.evaluationRepository.findById(1).orElseThrow().getPublicComment();
+
+        PeerEvaluationDto peerEvaluationDto = new PeerEvaluationDto(1, "2023-W31", 4, "John Smith", 5, "Eric Hudson", ratingDtos, 41.0, "Rewritten", "Rewritten", null, null);
+        String json = this.jsonMapper.writeValueAsString(peerEvaluationDto);
+
+        // When and then
+        this.mockMvc.perform(put(this.baseUrl + "/evaluations/1").contentType(MediaType.APPLICATION_JSON).content(json).accept(MediaType.APPLICATION_JSON).header(HttpHeaders.AUTHORIZATION, this.studentJohnToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(StatusCode.INVALID_ARGUMENT))
+                .andExpect(jsonPath("$.message").value("This teammate's account is deactivated."));
+        this.entityManager.flush();
+        this.entityManager.clear();
+        assertThat(this.evaluationRepository.findById(1).orElseThrow().getPublicComment()).isEqualTo(publicCommentBefore);
+    }
+
+    private Student deactivate(String email) {
+        Student student = this.entityManager.createQuery("select s from Student s where s.email = :email", Student.class)
+                .setParameter("email", email)
+                .getSingleResult();
+        student.deactivate(LocalDateTime.of(2023, 8, 7, 9, 0));
+        this.entityManager.flush();
+        return student;
     }
 
     @Test

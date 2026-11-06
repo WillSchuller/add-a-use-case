@@ -4,6 +4,7 @@ import type {
   StudentSearchCriteria,
   SearchStudentByCriteriaResponse,
   CreateStudentResponse,
+  DeactivateStudentResponse,
   DeleteStudentResponse,
   FindStudentByIdResponse,
   UpdateStudentResponse,
@@ -35,6 +36,15 @@ export const updateStudent = (updatedStudent: Student) =>
   request.put<any, UpdateStudentResponse>(
     `${API.STUDENTS_ENDPOINT}/${updatedStudent.id}`,
     updatedStudent
+  )
+
+// The server emails her before it answers, so it gets longer than the default 10 seconds. Otherwise a slow mail server
+// would cost the admin the alert for a deactivation that has already committed (UC-STU-deactivate-student 6b).
+export const deactivateStudent = (id: number) =>
+  request.post<any, DeactivateStudentResponse>(
+    `${API.STUDENTS_ENDPOINT}/${id}/deactivate`,
+    undefined,
+    { timeout: 120_000 }
   )
 
 export const deleteStudent = (id: number) =>
