@@ -142,6 +142,22 @@ class StudentDeactivationIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    @DisplayName("A teammate reading her team receives enabled false for her, which the evaluation form leaves her out by")
+    void aTeammateReadingTheTeamSeesHerAsDeactivated() throws Exception {
+        // Given
+        deactivateJohn(this.instructorBillToken).andExpect(status().isOk());
+        this.entityManager.flush();
+
+        // When and then
+        this.mockMvc.perform(get(this.baseUrl + "/students/teams/" + this.john.getTeam().getTeamId())
+                        .accept(MediaType.APPLICATION_JSON)
+                        .header(HttpHeaders.AUTHORIZATION, login("e.hudson@abc.edu")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.email == 'j.smith@abc.edu')].enabled").value(false))
+                .andExpect(jsonPath("$.data[?(@.email == 'e.hudson@abc.edu')].enabled").value(true));
+    }
+
     // 3a. The user is not permitted to deactivate this student, or the student does not exist
 
     @Test

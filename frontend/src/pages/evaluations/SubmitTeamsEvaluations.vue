@@ -119,6 +119,7 @@
 </template>
 
 <script setup lang="ts">
+import axios from 'axios'
 import { onMounted, ref } from 'vue'
 import { findStudentsByTeamId } from '@/apis/student'
 import type { Student, FindStudentByTeamIdResponse } from '@/apis/student/types'
@@ -202,14 +203,22 @@ async function prepareStartingPeerEvaluations() {
     previousWeek.value
   )
 
+  // A deactivated team member is left out, of a new form and of one showing submitted evaluations
+  // (UC-EVA-submit-evaluation 2a, BR-deactivated-evaluatee)
+  const activeTeamMembers = students.value.filter((student) => student.enabled)
+  const activeTeamMemberIds = new Set(activeTeamMembers.map((student) => student.id))
+  const submittedEvaluations = result.data.filter((evaluation) =>
+    activeTeamMemberIds.has(evaluation.evaluateeId)
+  )
+
   // If the student has already submitted evaluations for the current week, load them
-  if (result.data.length > 0) {
-    peerEvalutions.value = result.data
+  if (submittedEvaluations.length > 0) {
+    peerEvalutions.value = submittedEvaluations
     isNewSubmission = false
   } else {
     // If not, create a new set of evaluations
     isNewSubmission = true
-    peerEvalutions.value = students.value.map((student) => ({
+    peerEvalutions.value = activeTeamMembers.map((student) => ({
       week: previousWeek.value,
       evaluatorId: (userInfoStore.userInfo as Student).id as number,
       evaluateeId: student.id as number,
@@ -228,12 +237,15 @@ async function prepareStartingPeerEvaluations() {
 // Submit peer evaluations
 async function submitPeerEvaluations() {
   if (peerEvalutions.value) {
-    const submitPromises = peerEvalutions.value.map(async (evaluation) => {
-      const result: SubmitPeerEvaluationResponse = await submitEvaluation(evaluation)
-      return result.data
-    })
     isLoading.value = true
-    peerEvalutions.value = await Promise.all(submitPromises) // Wait for all promises to resolve
+    const saved = await settleSaves(
+      peerEvalutions.value.map(async (evaluation) => {
+        const result: SubmitPeerEvaluationResponse = await submitEvaluation(evaluation)
+        return result.data
+      })
+    )
+    if (!saved) return
+    peerEvalutions.value = saved
     isNewSubmission = false // Change to update mode
     ElMessage.success('Peer evaluations submitted successfully')
     isLoading.value = false
@@ -247,16 +259,44 @@ async function submitPeerEvaluations() {
 // Update peer evaluations
 async function updatePeerEvaluations() {
   if (peerEvalutions.value) {
-    const submitPromises = peerEvalutions.value.map(async (evaluation) => {
-      const result: UpdatePeerEvaluationResponse = await updateEvaluation(evaluation)
-      return result.data
-    })
-
     isLoading.value = true
-    peerEvalutions.value = await Promise.all(submitPromises) // Wait for all promises to resolve
+    const saved = await settleSaves(
+      peerEvalutions.value.map(async (evaluation) => {
+        const result: UpdatePeerEvaluationResponse = await updateEvaluation(evaluation)
+        return result.data
+      })
+    )
+    if (!saved) return
+    peerEvalutions.value = saved
     ElMessage.success('Peer evaluations updated successfully')
     isLoading.value = false
   }
+}
+
+/**
+ * Waits for every save to finish, and returns the saved evaluations if all of them succeeded.
+ *
+ * Otherwise returns undefined, with no success message or receipt to follow. On a 400, such as a stale form naming a
+ * team member deactivated since it loaded (UC-EVA-submit-evaluation 9a), the shared request instance has shown the
+ * server's message, and the form reloads to what is now true: the evaluations that were saved stand, and she is gone.
+ * It waits for all of them first, so the reload cannot miss a save still in flight.
+ */
+async function settleSaves(saves: Promise<PeerEvaluation>[]) {
+  const results = await Promise.allSettled(saves)
+  const failures = results.filter((result) => result.status === 'rejected')
+  if (failures.length === 0) {
+    return results.map((result) => (result as PromiseFulfilledResult<PeerEvaluation>).value)
+  }
+
+  const refused = failures.some(
+    ({ reason }) => axios.isAxiosError(reason) && reason.response?.status === 400
+  )
+  if (refused) {
+    await loadStudents()
+    await prepareStartingPeerEvaluations()
+  }
+  isLoading.value = false
+  return undefined
 }
 </script>
 
