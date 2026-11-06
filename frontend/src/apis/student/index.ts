@@ -38,8 +38,14 @@ export const updateStudent = (updatedStudent: Student) =>
     updatedStudent
   )
 
+// The server emails her before it answers, so it gets longer than the default 10 seconds. Otherwise a slow mail server
+// would cost the admin the alert for a deactivation that has already committed (UC-STU-deactivate-student 6b).
 export const deactivateStudent = (id: number) =>
-  request.post<any, DeactivateStudentResponse>(`${API.STUDENTS_ENDPOINT}/${id}/deactivate`)
+  request.post<any, DeactivateStudentResponse>(
+    `${API.STUDENTS_ENDPOINT}/${id}/deactivate`,
+    undefined,
+    { timeout: 120_000 }
+  )
 
 export const deleteStudent = (id: number) =>
   request.delete<any, DeleteStudentResponse>(`${API.STUDENTS_ENDPOINT}/${id}`)

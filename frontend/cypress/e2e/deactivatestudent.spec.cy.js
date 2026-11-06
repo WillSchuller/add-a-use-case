@@ -112,6 +112,23 @@ describe('Deactivate a student', () => {
     )
   })
 
+  it('still shows the result when the mail server makes the answer take longer than 10 seconds (6b)', () => {
+    cy.intercept('POST', '**/students/4/deactivate', {
+      ...deactivated(false),
+      delay: 11_000 // Longer than the shared request instance's default timeout
+    }).as('deactivate')
+    openEditForm(found())
+
+    chooseDeactivate()
+    confirmWarning()
+
+    cy.wait('@deactivate', { timeout: 15_000 })
+    cy.get('.el-message--warning', { timeout: 15_000 }).should(
+      'contain',
+      'John Smith has been deactivated but could not be notified.'
+    )
+  })
+
   it('hides the Status switch for an active student', () => {
     openEditForm(found())
 
