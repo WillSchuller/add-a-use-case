@@ -3,6 +3,7 @@ package team.projectpulse.student;
 import team.projectpulse.student.converter.StudentDtoToStudentConverter;
 import team.projectpulse.student.converter.StudentRegistrationToStudentConverter;
 import team.projectpulse.student.converter.StudentToStudentDtoConverter;
+import team.projectpulse.student.dto.StudentDeactivationDto;
 import team.projectpulse.student.dto.StudentDto;
 import team.projectpulse.student.dto.StudentRegistrationRequest;
 import team.projectpulse.system.Result;
@@ -24,13 +25,15 @@ public class StudentController {
     private final StudentRegistrationToStudentConverter studentRegistrationToStudentConverter;
     private final StudentToStudentDtoConverter studentToStudentDtoConverter;
     private final StudentDtoToStudentConverter studentDtoToStudentConverter;
+    private final StudentDeactivationNotifier studentDeactivationNotifier;
 
 
-    public StudentController(StudentService studentService, StudentRegistrationToStudentConverter studentRegistrationToStudentConverter, StudentToStudentDtoConverter studentToStudentDtoConverter, StudentDtoToStudentConverter studentDtoToStudentConverter) {
+    public StudentController(StudentService studentService, StudentRegistrationToStudentConverter studentRegistrationToStudentConverter, StudentToStudentDtoConverter studentToStudentDtoConverter, StudentDtoToStudentConverter studentDtoToStudentConverter, StudentDeactivationNotifier studentDeactivationNotifier) {
         this.studentService = studentService;
         this.studentRegistrationToStudentConverter = studentRegistrationToStudentConverter;
         this.studentToStudentDtoConverter = studentToStudentDtoConverter;
         this.studentDtoToStudentConverter = studentDtoToStudentConverter;
+        this.studentDeactivationNotifier = studentDeactivationNotifier;
     }
 
     @PostMapping("/search")
@@ -68,6 +71,18 @@ public class StudentController {
         Student updatedStudent = this.studentService.updateStudent(studentId, update);
         StudentDto updatedStudentDto = this.studentToStudentDtoConverter.convert(updatedStudent);
         return new Result(true, StatusCode.SUCCESS, "Update student successfully", updatedStudentDto);
+    }
+
+    /**
+     * UC-STU-deactivate-student. The email is sent here, after the service's transaction has committed, so that a mail
+     * failure leaves her deactivated and the response can say she was not notified (extension 6b).
+     */
+    @PostMapping("/{studentId}/deactivate")
+    public Result deactivateStudent(@PathVariable Integer studentId) {
+        Student student = this.studentService.deactivateStudent(studentId);
+        boolean noticeSent = this.studentDeactivationNotifier.notify(student);
+        StudentDto studentDto = this.studentToStudentDtoConverter.convert(student);
+        return new Result(true, StatusCode.SUCCESS, "Deactivate student successfully", new StudentDeactivationDto(studentDto, noticeSent));
     }
 
     @DeleteMapping("/{studentId}")
